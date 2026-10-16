@@ -1,0 +1,65 @@
+#include <Servo.h>
+
+const int TRIG_SPOT = 2;
+const int ECHO_SPOT = 3;
+const int TRIG_GATE = 4;
+const int ECHO_GATE = 5;
+const int LED_RED = 10;
+const int LED_GREEN = 11;
+const int SERVO_PIN = 9;
+
+const int SPOT_DISTANCE = 15;   
+const int GATE_DISTANCE = 15;   
+const int ANGLE_CLOSED = 0;
+const int ANGLE_OPEN = 90;
+const unsigned long CLOSE_DELAY = 3000; 
+Servo barrier;
+bool gateOpen = false;
+unsigned long lastCarSeen = 0;
+
+long readDistance(int trig, int echo) {
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  long duration = pulseIn(echo, HIGH, 30000);
+  if (duration == 0) return 999; 
+  return duration * 0.034 / 2;
+}
+
+void setup() {
+  pinMode(TRIG_SPOT, OUTPUT);
+  pinMode(ECHO_SPOT, INPUT);
+  pinMode(TRIG_GATE, OUTPUT);
+  pinMode(ECHO_GATE, INPUT);
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
+  barrier.attach(SERVO_PIN);
+  barrier.write(ANGLE_CLOSED);
+  Serial.begin(9600);
+}
+
+void loop() {
+  long spotDist = readDistance(TRIG_SPOT, ECHO_SPOT);
+  delay(50); 
+  long gateDist = readDistance(TRIG_GATE, ECHO_GATE);
+
+  bool occupied = spotDist < SPOT_DISTANCE;
+  digitalWrite(LED_RED, occupied ? HIGH : LOW);
+  digitalWrite(LED_GREEN, occupied ? LOW : HIGH);
+
+  bool carAtGate = gateDist < GATE_DISTANCE;
+  if (carAtGate) {
+    lastCarSeen = millis();
+    if (!gateOpen) {
+      barrier.write(ANGLE_OPEN);
+      gateOpen = true;
+    }
+  }
+
+  if (gateOpen && millis() - lastCarSeen > CLOSE_DELAY) {
+    barrier.write(ANGLE_CLOSED);
+    gateOpen = false;
+  }
+}
